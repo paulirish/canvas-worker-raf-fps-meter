@@ -14,6 +14,9 @@ function getReportedRenderTimeForEntry(entry) {
 // ...this heiristic can become a problem on screens with refresh rates higher than 120hz, since after that, there is less than an 8ms gap between renderTimes.
 // ...also, if presentation times are not accurate or not vsync aligned, issues with grouping can arrise even at 60hz.
 function groupEntriesByEstimatedFrameRenderTime(entries) {
+    // paul here. dont understand the frames thing so w/e
+    // return [entries];
+
 	entries.sort((a,b) => getReportedRenderTimeForEntry(a) - getReportedRenderTimeForEntry(b));
 
 	const ret = []; // entry[][]
@@ -194,7 +197,7 @@ function estimateInteractonCountByEntries(entries) {
 
 // Known failures:
 // - none so far
-export function estimateInteractionCountsByEventCounts() {
+function estimateInteractionCountsByEventCounts() {
     const drag = performance.eventCounts.get('dragstart');
 	// TODO: pinch zoom gets 2 pointer cancels...
 	const touchScroll = performance.eventCounts.get('pointercancel') - drag;
@@ -209,7 +212,7 @@ export function estimateInteractionCountsByEventCounts() {
 // setInterval(() => console.log('interactionCount:', estimateInteractionCountByEventCounts()), 1000);
 
 // Generate interesting timings for a specific frame of entries
-function getTimingsForFrame(entries) {
+function getTimingsForFrame(entries, opts = {}) {
 	// A note here: many entries can share startTime.  Use the first one, but don't assume its the first to get processed.
 	// It is possible that processing could take priority by event type, and be out of order of dispatch.  I am not sure.
 	// TODO: Should test e.g. passive event handlers which are dispatched to main late...
@@ -240,6 +243,28 @@ function getTimingsForFrame(entries) {
 	const psPct = psTime / duration;
 	const gapPct = psGap / duration;
 	const presentatonPct = presentationDelay / duration;
+
+
+    if (true || opts.addMeasures) {
+
+        // Add measures so you can see the breakdown in the DevTools performance panel.
+        performance.measure(`latency`, {
+            start: startTime,
+            end: startTime + duration,
+        });
+        performance.measure(`delay`, {
+            start: startTime,
+            end: firstProcessedEntry.processingStart,
+        });
+        performance.measure(`processing`, {
+            start: firstProcessedEntry.processingStart,
+            end: lastProcessedEntry.processingEnd,
+        });
+        performance.measure(`presentation`, {
+            start: lastProcessedEntry.processingEnd,
+            end: renderTime,
+        });
+    }
 
 	return {
 		startTime,
@@ -287,7 +312,7 @@ function pctToString(obj) {
 	return obj;
 }
 
-export function measureResponsiveness() {
+function measureResponsiveness() {
 	// Storing all entries may have negative GC implications
 	// Not just the entries, but also the Node references from entry.target... not sure if those are weak?
 	const AllEntries = [];
@@ -306,6 +331,9 @@ export function measureResponsiveness() {
 		// Optional: Filter down the single longest frame
 		// timingsByFrame = [timingsByFrame.reduce((prev,curr) => (curr.duration > prev.duration) ? curr : prev)];
 
+        // paul here. still dont understand the frames thing but.. w/e
+        // getTimingsForFrame(AllEntries, {addMeasures: true});
+
 		console.log(`Now have ${AllInteractionIds.length} interactions, in ${entriesByFrame.length} frames, with ${AllEntries.length} entries.`);
 		console.table(timingsByFrame.map(decorateTimings));
 	});
@@ -320,7 +348,7 @@ export function measureResponsiveness() {
 }
 
 
-export function measureEvents() {
+function measureEvents() {
 	const observer = new PerformanceObserver(list => {
 		console.group(performance.now().toFixed(1));
 		[...list.getEntries()].forEach(entry => console.log([entry.name, entry.interactionId]));
@@ -335,4 +363,4 @@ export function measureEvents() {
 }
 
 
-// measureResponsiveness();
+measureResponsiveness();
